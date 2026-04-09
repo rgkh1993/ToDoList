@@ -103,6 +103,9 @@ html,body{height:100%;width:100%;font-family:var(--font);color:var(--text1);over
 .ro-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:9px;background:linear-gradient(135deg,var(--accent),var(--accent2))}
 .del{position:absolute;right:0;top:0;width:78px;height:100%;background:linear-gradient(135deg,#b03a2a,#c45c20);display:flex;align-items:center;justify-content:center;cursor:pointer;border-top:1px solid rgba(255,255,255,0.06)}
 .del svg{stroke:white;fill:none;width:18px;height:18px;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* Hide the persistent delete button visually; swipe will trigger delete */
+.del{opacity:0;pointer-events:none}
 .empty-hint{display:flex;align-items:center;gap:7px;padding:11px 16px 14px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;border-top:1px solid var(--divider);transition:color 0.15s}
 .empty-hint:active{color:var(--accent)}
 .empty-hint svg{stroke:currentColor;fill:none;width:13px;height:13px;stroke-width:2.5;stroke-linecap:round}
@@ -155,7 +158,7 @@ html,body{height:100%;width:100%;font-family:var(--font);color:var(--text1);over
 <div class="phone">
   <div class="hdr">
     <div class="title">Khemka <span class="title-grad">To Do's</span></div>
-    <div class="subtitle">Your shared family canvas</div>
+    <div class="subtitle" id="subtitle">Your shared family canvas</div>
     <div class="legend">
       <div class="pill"><span class="pill-em">👨🏻</span> Rishab</div>
       <div class="pill"><span class="pill-em">👩🏻</span> Kimi</div>
@@ -228,7 +231,7 @@ function setSyncDot(state) {
 }
 
 // ── App state ─────────────────────────────────
-const OWNERS = { rishab: '👨🏻', kimi: '👩🏻' };
+const OWNERS = { rishab: '👨🏻', kimi: '👩🏻', both: '👫' };
 const CIRC = 2 * Math.PI * 14;
 let todos = []; // flat array from supabase
 let openKey = null;
@@ -274,6 +277,36 @@ async function rollover() {
 
 // ── Render ────────────────────────────────────
 const feed = document.getElementById('feed');
+// Subtitle inline edit (persisted to localStorage)
+const subtitleEl = document.getElementById('subtitle');
+function loadSubtitle() {
+  try {
+    const s = localStorage.getItem('todo_subtitle');
+    if (s && subtitleEl) subtitleEl.textContent = s;
+  } catch (e) { /* ignore */ }
+}
+function saveSubtitle(text) {
+  try { localStorage.setItem('todo_subtitle', text); } catch (e) {}
+}
+if (subtitleEl) {
+  subtitleEl.style.cursor = 'text';
+  subtitleEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    subtitleEl.contentEditable = 'true';
+    subtitleEl.focus();
+    const range = document.createRange(); range.selectNodeContents(subtitleEl);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  });
+  subtitleEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); subtitleEl.blur(); }
+  });
+  subtitleEl.addEventListener('blur', () => {
+    subtitleEl.contentEditable = 'false';
+    const v = (subtitleEl.textContent || '').trim() || 'Your shared family canvas';
+    subtitleEl.textContent = v;
+    saveSubtitle(v);
+  });
+}
 
 function getTodosForDay(key) {
   return todos.filter(t => t.date === key);
@@ -391,6 +424,28 @@ function mkRow(todo, key) {
   item.appendChild(cb); item.appendChild(wrap);
   if (todo.rolled_from) { const dot=document.createElement('div'); dot.className='ro-dot'; item.appendChild(dot); }
   const em=document.createElement('div'); em.className='own-em'; em.textContent=OWNERS[todo.owner]||'👨🏻';
+  em.style.cursor = 'pointer';
+  em.title = 'Change owner';
+  em.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const id = todo.id;
+    const current = todo.owner || 'rishab';
+    const order = ['rishab','kimi','both'];
+    let idx = order.indexOf(current);
+    if (idx === -1) idx = 0;
+    const next = order[(idx + 1) % order.length];
+    // optimistic UI
+    todo.owner = next;
+    em.textContent = OWNERS[next] || '👨🏻';
+    try {
+      await updateTodo(id, { owner: next });
+    } catch (err) {
+      console.error('Owner update failed', err);
+      // revert on failure
+      todo.owner = current;
+      em.textContent = OWNERS[current] || '👨🏻';
+    }
+  });
   item.appendChild(em);
   let sx=0;
   item.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;},{passive:true});
@@ -401,7 +456,14 @@ function mkRow(todo, key) {
   },{passive:true});
   item.addEventListener('touchend',e=>{
     const dx=e.changedTouches[0].clientX-sx; item.style.transform='';
-    dx<-44?item.classList.add('swiped'):item.classList.remove('swiped');
+    if (dx < -44) {
+      item.classList.add('swiped');
+      // Trigger delete after a short delay so the swipe animation is visible
+      const rowEl = item.parentElement;
+      setTimeout(() => doDelete(todo.id, rowEl), 160);
+    } else {
+      item.classList.remove('swiped');
+    }
   });
   row.appendChild(item); return row;
 }
@@ -416,16 +478,18 @@ function mkAddArea(key) {
   const toggle=document.createElement('div'); toggle.className='owner-toggle';
   const bR=document.createElement('button'); bR.className='own-btn sel'; bR.textContent='👨🏻'; bR.dataset.o='rishab';
   const bK=document.createElement('button'); bK.className='own-btn'; bK.textContent='👩🏻'; bK.dataset.o='kimi';
-  toggle.appendChild(bR); toggle.appendChild(bK);
+  const bBoth=document.createElement('button'); bBoth.className='own-btn'; bBoth.textContent='👫'; bBoth.dataset.o='both';
+  toggle.appendChild(bR); toggle.appendChild(bK); toggle.appendChild(bBoth);
   const sub=document.createElement('button'); sub.className='sub-btn'; sub.disabled=true;
   sub.innerHTML=`<svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>`;
   inp.addEventListener('input',()=>sub.disabled=!inp.value.trim());
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doAdd(key,inp,selOwner);}});
   sub.addEventListener('click',()=>doAdd(key,inp,selOwner));
-  [bR,bK].forEach(b=>b.addEventListener('click',()=>{
+  [bR,bK,bBoth].forEach(b=>b.addEventListener('click',()=>{
     selOwner=b.dataset.o;
     bR.classList.toggle('sel',selOwner==='rishab');
     bK.classList.toggle('sel',selOwner==='kimi');
+    bBoth.classList.toggle('sel',selOwner==='both');
   }));
   row.appendChild(inp); row.appendChild(toggle); row.appendChild(sub);
   inner.appendChild(row); area.appendChild(inner); return area;
@@ -541,6 +605,7 @@ function handleRealtimeEvent(event, record, oldRecord) {
         item.classList.toggle('done-item',record.done);
         const cb=item.querySelector('.cb'); if(cb) cb.classList.toggle('done',record.done);
         const ta=item.querySelector('.ttext'); if(ta&&document.activeElement!==ta) ta.value=record.text;
+        const em=item.querySelector('.own-em'); if(em) em.textContent = OWNERS[todos[idx].owner] || '👨🏻';
       }
       const card=feed.querySelector(`[data-key="${key}"]`); if(card) refreshRing(key,card);
     }
@@ -571,6 +636,8 @@ async function boot() {
   try {
     todos = await fetchTodos();
     await rollover();
+    // load saved subtitle before rendering
+    loadSubtitle();
     render();
     connectRealtime(handleRealtimeEvent);
   } catch(e) {
