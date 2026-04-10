@@ -101,17 +101,18 @@ html,body{height:100%;width:100%;font-family:var(--font);color:var(--text1);over
 .titem.done-item .ttext{color:var(--done);text-decoration:line-through;text-decoration-color:var(--text3)}
 .own-em{font-size:16px;line-height:1;flex-shrink:0;margin-top:2px}
 .ro-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:9px;background:linear-gradient(135deg,var(--accent),var(--accent2))}
+/* Recurring badge on task row */
+.rec-badge{font-size:11px;line-height:1;flex-shrink:0;margin-top:4px;opacity:0.55;cursor:default}
 .del{position:absolute;right:0;top:0;width:78px;height:100%;background:linear-gradient(135deg,#b03a2a,#c45c20);display:flex;align-items:center;justify-content:center;cursor:pointer;border-top:1px solid rgba(255,255,255,0.06)}
 .del svg{stroke:white;fill:none;width:18px;height:18px;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-
 /* Hide the persistent delete button visually; swipe will trigger delete */
 .del{opacity:0;pointer-events:none}
 .empty-hint{display:flex;align-items:center;gap:7px;padding:11px 16px 14px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;border-top:1px solid var(--divider);transition:color 0.15s}
 .empty-hint:active{color:var(--accent)}
 .empty-hint svg{stroke:currentColor;fill:none;width:13px;height:13px;stroke-width:2.5;stroke-linecap:round}
 .add-area{overflow:hidden;max-height:0;transition:max-height 0.32s cubic-bezier(0.4,0,0.2,1);border-top:1px solid transparent}
-.add-area.open{max-height:120px;border-top-color:var(--divider)}
-.add-inner{padding:10px 14px 13px}
+.add-area.open{max-height:220px;border-top-color:var(--divider)}
+.add-inner{padding:10px 14px 13px;display:flex;flex-direction:column;gap:8px}
 .add-row{display:flex;align-items:center;gap:8px;background:var(--glass-inner);border:1px solid var(--glass-border);border-radius:14px;padding:9px 10px 9px 14px}
 .add-input{flex:1;min-width:0;font-size:14.5px;font-weight:500;font-family:var(--font);background:transparent;border:none;outline:none;color:var(--text1);caret-color:var(--accent)}
 .add-input::placeholder{color:var(--text3)}
@@ -122,6 +123,21 @@ html,body{height:100%;width:100%;font-family:var(--font);color:var(--text1);over
 .sub-btn:disabled{opacity:0.28;box-shadow:none}
 .sub-btn:not(:disabled):active{transform:scale(0.86)}
 .sub-btn svg{stroke:white;fill:none;width:14px;height:14px;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── Recurrence toggle button ── */
+.rec-toggle{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--text3);flex-shrink:0;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s cubic-bezier(0.34,1.56,0.64,1);font-size:14px;line-height:1}
+.rec-toggle.on{background:linear-gradient(135deg,rgba(91,107,47,0.18),rgba(154,120,32,0.18));border-color:var(--accent);transform:scale(1.08)}
+
+/* ── Recurrence picker row ── */
+.rec-picker{display:flex;align-items:center;gap:6px;overflow:hidden;max-height:0;opacity:0;transition:max-height 0.25s ease,opacity 0.2s ease;padding:0 2px}
+.rec-picker.visible{max-height:44px;opacity:1}
+.rec-chip{font-size:12px;font-weight:600;padding:5px 11px;border-radius:20px;border:1.5px solid var(--glass-border);background:var(--glass-inner);color:var(--text2);cursor:pointer;transition:all 0.15s;white-space:nowrap;flex-shrink:0}
+.rec-chip.sel{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#fff}
+/* custom day/interval inputs */
+.rec-num{width:38px;font-size:12px;font-weight:600;padding:5px 6px;border-radius:10px;border:1.5px solid var(--glass-border);background:var(--glass-inner);color:var(--text1);text-align:center;outline:none;font-family:var(--font)}
+.rec-num:focus{border-color:var(--accent)}
+.rec-label{font-size:11px;font-weight:600;color:var(--text3);white-space:nowrap}
+
 /* Loading overlay */
 .loading{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg-from);gap:12px;transition:opacity 0.4s}
 .loading.hidden{opacity:0;pointer-events:none}
@@ -187,6 +203,11 @@ async function insertTodo(todo) {
   if (!r.ok) throw new Error(await r.text());
   return (await r.json())[0];
 }
+async function insertTodos(todoArr) {
+  const r = await api('todos', { method:'POST', body: JSON.stringify(todoArr) });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
 async function updateTodo(id, patch) {
   const r = await api(`todos?id=eq.${id}`, { method:'PATCH', body: JSON.stringify(patch) });
   if (!r.ok) throw new Error(await r.text());
@@ -200,7 +221,6 @@ async function deleteTodo(id) {
 function connectRealtime(onEvent) {
   const wsUrl = `${SB_URL.replace('https','wss')}/realtime/v1/websocket?apikey=${SB_KEY}&vsn=1.0.0`;
   let ws, pingInterval;
-
   function connect() {
     ws = new WebSocket(wsUrl);
     ws.onopen = () => {
@@ -214,11 +234,7 @@ function connectRealtime(onEvent) {
         onEvent(msg.event, msg.payload?.record, msg.payload?.old_record);
       }
     };
-    ws.onclose = () => {
-      setSyncDot('err');
-      clearInterval(pingInterval);
-      setTimeout(connect, 3000); // auto-reconnect
-    };
+    ws.onclose = () => { setSyncDot('err'); clearInterval(pingInterval); setTimeout(connect, 3000); };
     ws.onerror = () => { setSyncDot('err'); ws.close(); };
   }
   connect();
@@ -233,7 +249,7 @@ function setSyncDot(state) {
 // ── App state ─────────────────────────────────
 const OWNERS = { rishab: '👨🏻', kimi: '👩🏻', both: '👫' };
 const CIRC = 2 * Math.PI * 14;
-let todos = []; // flat array from supabase
+let todos = [];
 let openKey = null;
 
 const TODAY = new Date(); TODAY.setHours(0,0,0,0);
@@ -259,31 +275,60 @@ function buildDays() {
 }
 const days = buildDays();
 
-// ── Rollover (client-side, writes to DB) ──────
+// ── Rollover ──────────────────────────────────
 async function rollover() {
   const tk = todayKey();
-  const pastIncomplete = todos.filter(t => t.date < tk && !t.done);
+  const pastIncomplete = todos.filter(t => t.date < tk && !t.done && !t.recurrence_id);
   if (!pastIncomplete.length) return;
-
-  const todayIds = new Set(todos.filter(t => t.date === tk).map(t => t.id));
-
   for (const t of pastIncomplete) {
-    // Move to today in DB
     await updateTodo(t.id, { date: tk, rolled_from: t.rolled_from || t.date });
-    t.date = tk;
-    t.rolled_from = t.rolled_from || t.date;
+    t.date = tk; t.rolled_from = t.rolled_from || t.date;
   }
+}
+
+// ── Recurrence helpers ────────────────────────
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+// Given a start date string and a rule object, return array of 12 future date strings (not including start)
+function generateRecurringDates(startDateStr, rule) {
+  const dates = [];
+  let current = new Date(startDateStr + 'T00:00:00');
+
+  for (let i = 0; i < 12; i++) {
+    let next = new Date(current);
+
+    if (rule.type === 'daily') {
+      next.setDate(next.getDate() + (rule.interval || 1));
+    } else if (rule.type === 'weekly') {
+      next.setDate(next.getDate() + 7 * (rule.interval || 1));
+    } else if (rule.type === 'monthly') {
+      // Same day of month
+      const targetDay = next.getDate();
+      next.setMonth(next.getMonth() + (rule.interval || 1));
+      // Handle months with fewer days (e.g. Jan 31 → Feb 28)
+      if (next.getDate() !== targetDay) next.setDate(0);
+    } else if (rule.type === 'yearly') {
+      next.setFullYear(next.getFullYear() + 1);
+    }
+
+    dates.push(dKey(next));
+    current = next;
+  }
+  return dates;
 }
 
 // ── Render ────────────────────────────────────
 const feed = document.getElementById('feed');
-// Subtitle inline edit (persisted to localStorage)
+
+// Subtitle inline edit
 const subtitleEl = document.getElementById('subtitle');
 function loadSubtitle() {
-  try {
-    const s = localStorage.getItem('todo_subtitle');
-    if (s && subtitleEl) subtitleEl.textContent = s;
-  } catch (e) { /* ignore */ }
+  try { const s = localStorage.getItem('todo_subtitle'); if (s && subtitleEl) subtitleEl.textContent = s; } catch (e) {}
 }
 function saveSubtitle(text) {
   try { localStorage.setItem('todo_subtitle', text); } catch (e) {}
@@ -292,25 +337,19 @@ if (subtitleEl) {
   subtitleEl.style.cursor = 'text';
   subtitleEl.addEventListener('click', (e) => {
     e.stopPropagation();
-    subtitleEl.contentEditable = 'true';
-    subtitleEl.focus();
+    subtitleEl.contentEditable = 'true'; subtitleEl.focus();
     const range = document.createRange(); range.selectNodeContents(subtitleEl);
     const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
   });
-  subtitleEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); subtitleEl.blur(); }
-  });
+  subtitleEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); subtitleEl.blur(); } });
   subtitleEl.addEventListener('blur', () => {
     subtitleEl.contentEditable = 'false';
     const v = (subtitleEl.textContent || '').trim() || 'Your shared family canvas';
-    subtitleEl.textContent = v;
-    saveSubtitle(v);
+    subtitleEl.textContent = v; saveSubtitle(v);
   });
 }
 
-function getTodosForDay(key) {
-  return todos.filter(t => t.date === key);
-}
+function getTodosForDay(key) { return todos.filter(t => t.date === key); }
 
 function render() {
   const prev = feed.scrollTop;
@@ -326,8 +365,7 @@ function render() {
     const rolled = dayTodos.filter(t=>t.rolled_from);
 
     if (lastWknd !== wknd) {
-      const lbl = document.createElement('div');
-      lbl.className = 'week-label';
+      const lbl = document.createElement('div'); lbl.className = 'week-label';
       lbl.textContent = wknd ? '🌿 Weekend' : '📋 Weekdays';
       feed.appendChild(lbl);
     }
@@ -337,17 +375,14 @@ function render() {
     card.className = 'card' + (isToday?' today':'') + (wknd&&!isToday?' weekend':'');
     card.dataset.key = key;
 
-    // Header
     const hdr = document.createElement('div'); hdr.className = 'card-hdr';
     const labels = document.createElement('div'); labels.className = 'card-labels';
-    const nameRow = document.createElement('div');
-    nameRow.style.cssText = 'display:flex;align-items:center';
+    const nameRow = document.createElement('div'); nameRow.style.cssText = 'display:flex;align-items:center';
     const dn = document.createElement('div'); dn.className = 'day-name'; dn.textContent = fmtName(date);
     nameRow.appendChild(dn);
     if (wknd && !isToday) {
       const badge = document.createElement('span'); badge.className = 'wk-badge';
-      badge.textContent = date.getDay()===6?'Sat':'Sun';
-      nameRow.appendChild(badge);
+      badge.textContent = date.getDay()===6?'Sat':'Sun'; nameRow.appendChild(badge);
     }
     labels.appendChild(nameRow);
     const dd = document.createElement('div'); dd.className = 'day-date'; dd.textContent = fmtDate(date);
@@ -374,15 +409,12 @@ function render() {
     feed.appendChild(card);
   });
 
-  if (prev>0) { feed.scrollTop=prev; }
-  else { scrollToToday(); }
+  if (prev>0) { feed.scrollTop=prev; } else { scrollToToday(); }
 }
 
 function scrollToToday() {
   setTimeout(() => {
-    const tc = feed.querySelector('.card.today');
-    if (!tc) return;
-    // Position today card near top with a little breathing room
+    const tc = feed.querySelector('.card.today'); if (!tc) return;
     const feedRect = feed.getBoundingClientRect();
     const cardRect = tc.getBoundingClientRect();
     feed.scrollTop += cardRect.top - feedRect.top - 12;
@@ -410,6 +442,7 @@ function mkRow(todo, key) {
   const del=document.createElement('div'); del.className='del';
   del.innerHTML=`<svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>`;
   del.addEventListener('click',()=>doDelete(todo.id,row)); row.appendChild(del);
+
   const item=document.createElement('div');
   item.className='titem'+(todo.done?' done-item':''); item.dataset.id=todo.id;
   const cb=document.createElement('div'); cb.className='cb'+(todo.done?' done':'');
@@ -423,30 +456,26 @@ function mkRow(todo, key) {
   wrap.appendChild(ta);
   item.appendChild(cb); item.appendChild(wrap);
   if (todo.rolled_from) { const dot=document.createElement('div'); dot.className='ro-dot'; item.appendChild(dot); }
+
+  // Recurring badge
+  if (todo.recurrence_id) {
+    const rec = document.createElement('div'); rec.className='rec-badge';
+    rec.textContent='🔁'; rec.title='Recurring task'; item.appendChild(rec);
+  }
+
   const em=document.createElement('div'); em.className='own-em'; em.textContent=OWNERS[todo.owner]||'👨🏻';
-  em.style.cursor = 'pointer';
-  em.title = 'Change owner';
+  em.style.cursor='pointer'; em.title='Change owner';
   em.addEventListener('click', async (e) => {
     e.stopPropagation();
-    const id = todo.id;
-    const current = todo.owner || 'rishab';
-    const order = ['rishab','kimi','both'];
-    let idx = order.indexOf(current);
-    if (idx === -1) idx = 0;
-    const next = order[(idx + 1) % order.length];
-    // optimistic UI
-    todo.owner = next;
-    em.textContent = OWNERS[next] || '👨🏻';
-    try {
-      await updateTodo(id, { owner: next });
-    } catch (err) {
-      console.error('Owner update failed', err);
-      // revert on failure
-      todo.owner = current;
-      em.textContent = OWNERS[current] || '👨🏻';
-    }
+    const id=todo.id; const current=todo.owner||'rishab';
+    const order=['rishab','kimi','both']; let idx=order.indexOf(current);
+    if(idx===-1) idx=0; const next=order[(idx+1)%order.length];
+    todo.owner=next; em.textContent=OWNERS[next]||'👨🏻';
+    try { await updateTodo(id,{owner:next}); }
+    catch(err){ console.error('Owner update failed',err); todo.owner=current; em.textContent=OWNERS[current]||'👨🏻'; }
   });
   item.appendChild(em);
+
   let sx=0;
   item.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;},{passive:true});
   item.addEventListener('touchmove',e=>{
@@ -456,43 +485,100 @@ function mkRow(todo, key) {
   },{passive:true});
   item.addEventListener('touchend',e=>{
     const dx=e.changedTouches[0].clientX-sx; item.style.transform='';
-    if (dx < -44) {
+    if(dx<-44){
       item.classList.add('swiped');
-      // Trigger delete after a short delay so the swipe animation is visible
-      const rowEl = item.parentElement;
-      setTimeout(() => doDelete(todo.id, rowEl), 160);
-    } else {
-      item.classList.remove('swiped');
-    }
+      const rowEl=item.parentElement;
+      setTimeout(()=>doDelete(todo.id,rowEl),160);
+    } else { item.classList.remove('swiped'); }
   });
   row.appendChild(item); return row;
 }
 
 function mkAddArea(key) {
-  let selOwner='rishab';
-  const area=document.createElement('div'); area.className='add-area';
-  const inner=document.createElement('div'); inner.className='add-inner';
-  const row=document.createElement('div'); row.className='add-row';
-  const inp=document.createElement('input');
+  let selOwner = 'rishab';
+  let recOn = false;
+  let recType = 'monthly'; // default
+  let recInterval = 1;
+
+  const area = document.createElement('div'); area.className = 'add-area';
+  const inner = document.createElement('div'); inner.className = 'add-inner';
+
+  // Main input row
+  const row = document.createElement('div'); row.className = 'add-row';
+  const inp = document.createElement('input');
   inp.className='add-input'; inp.type='text'; inp.placeholder='What needs doing?'; inp.autocomplete='off';
-  const toggle=document.createElement('div'); toggle.className='owner-toggle';
+
+  // Owner toggle
+  const toggle = document.createElement('div'); toggle.className = 'owner-toggle';
   const bR=document.createElement('button'); bR.className='own-btn sel'; bR.textContent='👨🏻'; bR.dataset.o='rishab';
   const bK=document.createElement('button'); bK.className='own-btn'; bK.textContent='👩🏻'; bK.dataset.o='kimi';
   const bBoth=document.createElement('button'); bBoth.className='own-btn'; bBoth.textContent='👫'; bBoth.dataset.o='both';
   toggle.appendChild(bR); toggle.appendChild(bK); toggle.appendChild(bBoth);
-  const sub=document.createElement('button'); sub.className='sub-btn'; sub.disabled=true;
+
+  // Recurring toggle button
+  const recBtn = document.createElement('button'); recBtn.className='rec-toggle'; recBtn.title='Set as recurring';
+  recBtn.textContent='🔁';
+
+  // Submit button
+  const sub = document.createElement('button'); sub.className='sub-btn'; sub.disabled=true;
   sub.innerHTML=`<svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>`;
+
+  row.appendChild(inp); row.appendChild(toggle); row.appendChild(recBtn); row.appendChild(sub);
+
+  // Recurrence picker row (hidden until recBtn toggled)
+  const pickerRow = document.createElement('div'); pickerRow.className='rec-picker';
+
+  // Chips: Daily, Weekly, Monthly, Yearly
+  const chips = [
+    { label:'Daily', type:'daily' },
+    { label:'Weekly', type:'weekly' },
+    { label:'Monthly', type:'monthly' },
+    { label:'Yearly', type:'yearly' },
+  ];
+  const chipEls = chips.map(c => {
+    const ch = document.createElement('div'); ch.className='rec-chip'+(c.type===recType?' sel':'');
+    ch.textContent=c.label;
+    ch.addEventListener('click',()=>{
+      recType=c.type;
+      chipEls.forEach((el,i)=>el.classList.toggle('sel',chips[i].type===recType));
+      // show/hide interval input for daily/weekly
+      intervalWrap.style.display=(recType==='daily'||recType==='weekly')?'flex':'none';
+    });
+    return ch;
+  });
+  chipEls.forEach(c=>pickerRow.appendChild(c));
+
+  // Interval input (for daily/weekly)
+  const intervalWrap = document.createElement('div');
+  intervalWrap.style.cssText='display:none;align-items:center;gap:4px;flex-shrink:0';
+  const everyLbl = document.createElement('span'); everyLbl.className='rec-label'; everyLbl.textContent='every';
+  const numInp = document.createElement('input'); numInp.className='rec-num'; numInp.type='number'; numInp.min='1'; numInp.max='30'; numInp.value='1';
+  numInp.addEventListener('input',()=>recInterval=parseInt(numInp.value)||1);
+  intervalWrap.appendChild(everyLbl); intervalWrap.appendChild(numInp);
+  pickerRow.appendChild(intervalWrap);
+
+  // Wire up interactions
   inp.addEventListener('input',()=>sub.disabled=!inp.value.trim());
-  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doAdd(key,inp,selOwner);}});
-  sub.addEventListener('click',()=>doAdd(key,inp,selOwner));
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doAdd(key,inp,selOwner,recOn?{type:recType,interval:recInterval}:null);}});
+  sub.addEventListener('click',()=>doAdd(key,inp,selOwner,recOn?{type:recType,interval:recInterval}:null));
+
+  recBtn.addEventListener('click',()=>{
+    recOn=!recOn;
+    recBtn.classList.toggle('on',recOn);
+    pickerRow.classList.toggle('visible',recOn);
+    // expand add-area slightly more when picker is showing
+    area.style.maxHeight = recOn ? '220px' : '160px';
+  });
+
   [bR,bK,bBoth].forEach(b=>b.addEventListener('click',()=>{
     selOwner=b.dataset.o;
     bR.classList.toggle('sel',selOwner==='rishab');
     bK.classList.toggle('sel',selOwner==='kimi');
     bBoth.classList.toggle('sel',selOwner==='both');
   }));
-  row.appendChild(inp); row.appendChild(toggle); row.appendChild(sub);
-  inner.appendChild(row); area.appendChild(inner); return area;
+
+  inner.appendChild(row); inner.appendChild(pickerRow);
+  area.appendChild(inner); return area;
 }
 
 // ── Actions ───────────────────────────────────
@@ -508,30 +594,70 @@ function toggleAdd(key, card) {
   setTimeout(()=>{const i=area.querySelector('.add-input');if(i)i.focus();},260);
 }
 
-async function doAdd(key, inp, owner) {
+async function doAdd(key, inp, owner, recRule) {
   const text=inp.value.trim(); if(!text) return;
   inp.value=''; inp.dispatchEvent(new Event('input'));
-  const newTodo = { date:key, text, owner, done:false, rolled_from:null };
-  try {
-    const saved = await insertTodo(newTodo);
-    todos.push(saved);
-    // Optimistic UI
-    const card=feed.querySelector(`[data-key="${key}"]`); if(!card) return;
-    const list=card.querySelector('.tlist');
-    const hint=list.querySelector('.empty-hint');
-    if(hint){hint.remove(); card.insertBefore(mkDiv(),list);}
-    const newRow=mkRow(saved,key); newRow.classList.add('new-in');
-    list.appendChild(newRow); refreshRing(key,card);
-    setTimeout(()=>{
-      const a=card.querySelector('.add-area');
-      if(a){a.classList.add('open');openKey=key;}
-      const i=card.querySelector('.add-input'); if(i) i.focus();
-    },40);
-  } catch(e) { console.error('Add failed',e); }
+
+  if (recRule) {
+    // ── Recurring: insert first task + 12 future instances ──
+    const recId = generateUUID();
+    const ruleStr = JSON.stringify(recRule);
+    const futureDates = generateRecurringDates(key, recRule);
+
+    const allTasks = [
+      { date: key, text, owner, done: false, rolled_from: null, recurrence_id: recId, recurrence_rule: ruleStr },
+      ...futureDates.map(d => ({ date: d, text, owner, done: false, rolled_from: null, recurrence_id: recId, recurrence_rule: ruleStr }))
+    ];
+
+    try {
+      const saved = await insertTodos(allTasks);
+      saved.forEach(t => todos.push(t));
+      // Only add the first one to the visible card (others land on future day cards)
+      const first = saved.find(t => t.date === key);
+      if (first) {
+        const card = feed.querySelector(`[data-key="${key}"]`); if (!card) return;
+        const list = card.querySelector('.tlist');
+        const hint = list.querySelector('.empty-hint');
+        if (hint) { hint.remove(); card.insertBefore(mkDiv(), list); }
+        const newRow = mkRow(first, key); newRow.classList.add('new-in');
+        list.appendChild(newRow); refreshRing(key, card);
+      }
+      // Refresh all future day cards that are visible
+      futureDates.forEach(d => {
+        const c = feed.querySelector(`[data-key="${d}"]`); if (!c) return;
+        const t = saved.find(s => s.date === d); if (!t) return;
+        const list = c.querySelector('.tlist');
+        const hint = list.querySelector('.empty-hint');
+        if (hint) { hint.remove(); c.insertBefore(mkDiv(), list); }
+        const newRow = mkRow(t, d); newRow.classList.add('new-in');
+        list.appendChild(newRow); refreshRing(d, c);
+      });
+    } catch(e) { console.error('Recurring add failed', e); }
+
+  } else {
+    // ── Normal single task ──
+    const newTodo = { date:key, text, owner, done:false, rolled_from:null, recurrence_id:null, recurrence_rule:null };
+    try {
+      const saved = await insertTodo(newTodo);
+      todos.push(saved);
+      const card=feed.querySelector(`[data-key="${key}"]`); if(!card) return;
+      const list=card.querySelector('.tlist');
+      const hint=list.querySelector('.empty-hint');
+      if(hint){hint.remove(); card.insertBefore(mkDiv(),list);}
+      const newRow=mkRow(saved,key); newRow.classList.add('new-in');
+      list.appendChild(newRow); refreshRing(key,card);
+      setTimeout(()=>{
+        const a=card.querySelector('.add-area');
+        if(a){a.classList.add('open');openKey=key;}
+        const i=card.querySelector('.add-input'); if(i) i.focus();
+      },40);
+    } catch(e) { console.error('Add failed',e); }
+  }
 }
 
 async function doToggle(id, key) {
   const todo=todos.find(t=>t.id===id); if(!todo) return;
+  // Only toggle this instance — other recurring instances untouched
   todo.done=!todo.done;
   const item=feed.querySelector(`.titem[data-id="${id}"]`);
   if(item){
@@ -585,7 +711,6 @@ function handleRealtimeEvent(event, record, oldRecord) {
   if (event==='INSERT') {
     if (!todos.find(t=>t.id===record.id)) {
       todos.push(record);
-      // Add to UI without full re-render
       const key=record.date;
       const card=feed.querySelector(`[data-key="${key}"]`); if(!card) return;
       const list=card.querySelector('.tlist');
@@ -599,7 +724,6 @@ function handleRealtimeEvent(event, record, oldRecord) {
     if(idx>=0) {
       const key=todos[idx].date;
       todos[idx]={...todos[idx],...record};
-      // Refresh the specific item
       const item=feed.querySelector(`.titem[data-id="${record.id}"]`);
       if(item){
         item.classList.toggle('done-item',record.done);
@@ -636,16 +760,14 @@ async function boot() {
   try {
     todos = await fetchTodos();
     await rollover();
-    // load saved subtitle before rendering
     loadSubtitle();
     render();
     connectRealtime(handleRealtimeEvent);
   } catch(e) {
     console.error('Boot failed', e);
     setSyncDot('err');
-    render(); // still render empty UI
+    render();
   }
-  // Hide loading screen
   const loading=document.getElementById('loading');
   loading.classList.add('hidden');
   setTimeout(()=>loading.style.display='none',400);
