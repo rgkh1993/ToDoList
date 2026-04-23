@@ -329,14 +329,14 @@ const HDRS={'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'a
 const api=(path,opts={})=>fetch(`${SB_URL}/rest/v1/${path}`,{headers:HDRS,...opts});
 
 // ── Todos API ─────────────────────────────────
-const fetchTodos=async()=>{const r=await api('todos?select=*&order=created_at.asc');if(!r.ok)throw new Error(await r.text());return r.json();};
+const fetchTodos=async()=>{const r=await api('todos?select=*&order=created_at.asc&owner=in.(rishab,kimi,both)');if(!r.ok)throw new Error(await r.text());return r.json();};
 const insertTodo=async t=>{const r=await api('todos',{method:'POST',body:JSON.stringify(t)});if(!r.ok)throw new Error(await r.text());return(await r.json())[0];};
 const insertTodos=async a=>{const r=await api('todos',{method:'POST',body:JSON.stringify(a)});if(!r.ok)throw new Error(await r.text());return r.json();};
 const updateTodo=async(id,p)=>{const r=await api(`todos?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(p)});if(!r.ok)throw new Error(await r.text());};
 const deleteTodo=async id=>{const r=await api(`todos?id=eq.${id}`,{method:'DELETE'});if(!r.ok)throw new Error(await r.text());};
 
 // ── Notes API ─────────────────────────────────
-const fetchNotes=async()=>{const r=await api('notes?select=*&order=created_at.desc');if(!r.ok)throw new Error(await r.text());return r.json();};
+const fetchNotes=async()=>{const r=await api('notes?select=*&order=created_at.desc&owner=in.(rishab,kimi,both)');if(!r.ok)throw new Error(await r.text());return r.json();};
 const insertNote=async n=>{const r=await api('notes',{method:'POST',body:JSON.stringify(n)});if(!r.ok)throw new Error(await r.text());return(await r.json())[0];};
 const updateNote=async(id,p)=>{const r=await api(`notes?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(p)});if(!r.ok)throw new Error(await r.text());};
 const deleteNote=async id=>{const r=await api(`notes?id=eq.${id}`,{method:'DELETE'});if(!r.ok)throw new Error(await r.text());};
@@ -536,6 +536,7 @@ function refreshRing(key,card){const dt=getTodosForDay(key),done=dt.filter(t=>t.
 
 // ── Todo realtime ─────────────────────────────
 function handleTodoEvent(ev,rec,old){
+  const _owner=rec?.owner??old?.owner;if(!['rishab','kimi','both'].includes(_owner))return;
   if(ev==='INSERT'){if(!todos.find(t=>t.id===rec.id)){todos.push(rec);const key=rec.date,card=feed.querySelector(`[data-key="${key}"]`);if(!card)return;const list=card.querySelector('.tlist');const hint=list.querySelector('.empty-hint');if(hint){hint.remove();card.insertBefore(mkDiv(),list);}const nr=mkRow(rec,key);nr.classList.add('new-in');list.appendChild(nr);refreshRing(key,card);}}
   else if(ev==='UPDATE'){const idx=todos.findIndex(t=>t.id===rec.id);if(idx>=0){const key=todos[idx].date;todos[idx]={...todos[idx],...rec};const item=feed.querySelector(`.titem[data-id="${rec.id}"]`);if(item){item.classList.toggle('done-item',rec.done);const cb=item.querySelector('.cb');if(cb)cb.classList.toggle('done',rec.done);const ta=item.querySelector('.ttext');if(ta&&document.activeElement!==ta)ta.value=rec.text;const em=item.querySelector('.own-em');if(em)em.textContent=OWNERS[todos[idx].owner]||'👨🏻';}const card=feed.querySelector(`[data-key="${key}"]`);if(card)refreshRing(key,card);}}
   else if(ev==='DELETE'){const id=old?.id;if(!id)return;const todo=todos.find(t=>t.id===id);if(!todo)return;const key=todo.date;todos=todos.filter(t=>t.id!==id);const row=feed.querySelector(`.trow[data-id="${id}"]`);if(row){row.style.transition='opacity 0.15s';row.style.opacity='0';setTimeout(()=>{row.remove();const card=feed.querySelector(`[data-key="${key}"]`);if(!card)return;refreshRing(key,card);const list=card.querySelector('.tlist');if(list&&list.children.length===0){const dv=card.querySelector('.hdivider');if(dv)dv.remove();list.appendChild(mkEmptyHint(key,card));}},150);}}
@@ -646,6 +647,7 @@ async function doCreateNote(){
 
 // ── Notes realtime ────────────────────────────
 function handleNoteEvent(ev,rec,old){
+  const _owner=rec?.owner??old?.owner;if(!['rishab','kimi','both'].includes(_owner))return;
   if(ev==='INSERT'){if(!notes.find(n=>n.id===rec.id)){notes.unshift(rec);renderNotes();}}
   else if(ev==='UPDATE'){const idx=notes.findIndex(n=>n.id===rec.id);if(idx>=0){notes[idx]={...notes[idx],...rec};if(openNoteId===rec.id){if(document.activeElement!==noteDetailTitle)noteDetailTitle.value=rec.title;if(document.activeElement!==noteContent)noteContent.value=rec.content||'';noteDetailOwner.textContent=OWNERS[rec.owner]||'👨🏻';}renderNotes();}}
   else if(ev==='DELETE'){const id=old?.id;if(!id)return;notes=notes.filter(n=>n.id!==id);if(openNoteId===id)closeNote();renderNotes();}

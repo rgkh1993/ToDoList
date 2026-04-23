@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Khemka To Do's</title>
+<title>Reena's To Do's</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
@@ -256,8 +256,7 @@ html,body{height:100%;width:100%;font-family:var(--font);color:var(--text1);over
       <button class="tab-pill" id="toNotesBtn"><span class="tab-pill-icon">📋</span> Notes</button>
     </div>
     <div class="legend">
-      <div class="pill"><span class="pill-em">👨🏻</span> Rishab</div>
-      <div class="pill"><span class="pill-em">👩🏻</span> Kimi</div>
+      <div class="pill"><span class="pill-em">👵🏻</span> Reena</div>
       <div class="sync-dot" id="syncDot"></div>
     </div>
   </div>
@@ -275,8 +274,7 @@ html,body{height:100%;width:100%;font-family:var(--font);color:var(--text1);over
       <button class="tab-pill accent" id="toTodosBtn"><span class="tab-pill-icon">✓</span> To Do's</button>
     </div>
     <div class="legend">
-      <div class="pill"><span class="pill-em">👨🏻</span> Rishab</div>
-      <div class="pill"><span class="pill-em">👩🏻</span> Kimi</div>
+      <div class="pill"><span class="pill-em">👵🏻</span> Reena</div>
       <div class="sync-dot" id="syncDot2"></div>
     </div>
   </div>
@@ -293,7 +291,7 @@ html,body{height:100%;width:100%;font-family:var(--font);color:var(--text1);over
       <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg>
     </button>
     <input class="note-detail-title" id="noteDetailTitle" placeholder="Title" autocomplete="off" spellcheck="true"/>
-    <div class="note-detail-owner" id="noteDetailOwner" title="Tap to change owner">👨🏻</div>
+    <div class="note-detail-owner" id="noteDetailOwner" title="Tap to change owner">👵🏻</div>
   </div>
   <div class="note-detail-body">
     <textarea class="note-content" id="noteContent" placeholder="Start writing… shopping items, questions, ideas, anything." spellcheck="true"></textarea>
@@ -312,9 +310,7 @@ html,body{height:100%;width:100%;font-family:var(--font);color:var(--text1);over
     <div class="modal-owner-row">
       <span class="modal-owner-lbl">Owner</span>
       <div class="modal-owner-btns">
-        <button class="modal-own-btn sel" data-o="rishab">👨🏻</button>
-        <button class="modal-own-btn" data-o="kimi">👩🏻</button>
-        <button class="modal-own-btn" data-o="both">👫</button>
+        <button class="modal-own-btn sel" data-o="reena">👵🏻</button>
       </div>
     </div>
     <button class="modal-submit" id="modalSubmit" disabled>Create Note</button>
@@ -329,14 +325,14 @@ const HDRS={'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'a
 const api=(path,opts={})=>fetch(`${SB_URL}/rest/v1/${path}`,{headers:HDRS,...opts});
 
 // ── Todos API ─────────────────────────────────
-const fetchTodos=async()=>{const r=await api('todos?select=*&order=created_at.asc');if(!r.ok)throw new Error(await r.text());return r.json();};
+const fetchTodos=async()=>{const r=await api('todos?select=*&order=created_at.asc&owner=in.(reena)');if(!r.ok)throw new Error(await r.text());return r.json();};
 const insertTodo=async t=>{const r=await api('todos',{method:'POST',body:JSON.stringify(t)});if(!r.ok)throw new Error(await r.text());return(await r.json())[0];};
 const insertTodos=async a=>{const r=await api('todos',{method:'POST',body:JSON.stringify(a)});if(!r.ok)throw new Error(await r.text());return r.json();};
 const updateTodo=async(id,p)=>{const r=await api(`todos?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(p)});if(!r.ok)throw new Error(await r.text());};
 const deleteTodo=async id=>{const r=await api(`todos?id=eq.${id}`,{method:'DELETE'});if(!r.ok)throw new Error(await r.text());};
 
 // ── Notes API ─────────────────────────────────
-const fetchNotes=async()=>{const r=await api('notes?select=*&order=created_at.desc');if(!r.ok)throw new Error(await r.text());return r.json();};
+const fetchNotes=async()=>{const r=await api('notes?select=*&order=created_at.desc&owner=in.(reena)');if(!r.ok)throw new Error(await r.text());return r.json();};
 const insertNote=async n=>{const r=await api('notes',{method:'POST',body:JSON.stringify(n)});if(!r.ok)throw new Error(await r.text());return(await r.json())[0];};
 const updateNote=async(id,p)=>{const r=await api(`notes?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(p)});if(!r.ok)throw new Error(await r.text());};
 const deleteNote=async id=>{const r=await api(`notes?id=eq.${id}`,{method:'DELETE'});if(!r.ok)throw new Error(await r.text());};
@@ -366,7 +362,7 @@ function connectRealtime(onTodo,onNote){
 function setSyncDot(s){['syncDot','syncDot2'].forEach(id=>{const d=document.getElementById(id);if(d)d.className='sync-dot'+(s==='live'?' live':s==='err'?' err':'');});}
 
 // ── State ─────────────────────────────────────
-const OWNERS={rishab:'👨🏻',kimi:'👩🏻',both:'👫'};
+const OWNERS={reena:'👵🏻'};
 const CIRC=2*Math.PI*14;
 let todos=[],notes=[],openKey=null,openNoteId=null;
 
@@ -477,8 +473,8 @@ function mkRow(todo,key){
   wrap.appendChild(ta);item.appendChild(cb);item.appendChild(wrap);
   if(todo.rolled_from){const dot=document.createElement('div');dot.className='ro-dot';item.appendChild(dot);}
   if(todo.recurrence_id){const rb=document.createElement('div');rb.className='rec-badge';rb.textContent='🔁';item.appendChild(rb);}
-  const em=document.createElement('div');em.className='own-em';em.textContent=OWNERS[todo.owner]||'👨🏻';em.style.cursor='pointer';
-  em.addEventListener('click',async e=>{e.stopPropagation();const id=todo.id,cur=todo.owner||'rishab',order=['rishab','kimi','both'];let idx=order.indexOf(cur);if(idx===-1)idx=0;const next=order[(idx+1)%order.length];todo.owner=next;em.textContent=OWNERS[next]||'👨🏻';try{await updateTodo(id,{owner:next});}catch(err){todo.owner=cur;em.textContent=OWNERS[cur]||'👨🏻';}});
+  const em=document.createElement('div');em.className='own-em';em.textContent=OWNERS[todo.owner]||'👵🏻';
+  em.addEventListener('click',e=>e.stopPropagation());
   item.appendChild(em);
   let sx=0;
   item.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;},{passive:true});
@@ -487,19 +483,14 @@ function mkRow(todo,key){
   row.appendChild(item);return row;
 }
 function mkAddArea(key){
-  let selOwner='rishab',recOn=false,recType='monthly',recInterval=1;
+  let selOwner='reena',recOn=false,recType='monthly',recInterval=1;
   const area=document.createElement('div');area.className='add-area';
   const inner=document.createElement('div');inner.className='add-inner';
   const row=document.createElement('div');row.className='add-row';
   const inp=document.createElement('input');inp.className='add-input';inp.type='text';inp.placeholder='What needs doing?';inp.autocomplete='off';
-  const toggle=document.createElement('div');toggle.className='owner-toggle';
-  const bR=document.createElement('button');bR.className='own-btn sel';bR.textContent='👨🏻';bR.dataset.o='rishab';
-  const bK=document.createElement('button');bK.className='own-btn';bK.textContent='👩🏻';bK.dataset.o='kimi';
-  const bBoth=document.createElement('button');bBoth.className='own-btn';bBoth.textContent='👫';bBoth.dataset.o='both';
-  toggle.appendChild(bR);toggle.appendChild(bK);toggle.appendChild(bBoth);
   const recBtn=document.createElement('button');recBtn.className='rec-toggle';recBtn.textContent='🔁';
   const sub=document.createElement('button');sub.className='sub-btn';sub.disabled=true;sub.innerHTML=`<svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>`;
-  row.appendChild(inp);row.appendChild(toggle);row.appendChild(recBtn);row.appendChild(sub);
+  row.appendChild(inp);row.appendChild(recBtn);row.appendChild(sub);
   const pickerRow=document.createElement('div');pickerRow.className='rec-picker';
   const chips=[{label:'Daily',type:'daily'},{label:'Weekly',type:'weekly'},{label:'Monthly',type:'monthly'},{label:'Yearly',type:'yearly'}];
   const chipEls=chips.map(c=>{const ch=document.createElement('div');ch.className='rec-chip'+(c.type===recType?' sel':'');ch.textContent=c.label;ch.addEventListener('click',()=>{recType=c.type;chipEls.forEach((el,i)=>el.classList.toggle('sel',chips[i].type===recType));intWrap.style.display=(recType==='daily'||recType==='weekly')?'flex':'none';});return ch;});
@@ -512,7 +503,6 @@ function mkAddArea(key){
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doAdd(key,inp,selOwner,recOn?{type:recType,interval:recInterval}:null);}});
   sub.addEventListener('click',()=>doAdd(key,inp,selOwner,recOn?{type:recType,interval:recInterval}:null));
   recBtn.addEventListener('click',()=>{recOn=!recOn;recBtn.classList.toggle('on',recOn);pickerRow.classList.toggle('visible',recOn);area.style.maxHeight=recOn?'220px':'160px';});
-  [bR,bK,bBoth].forEach(b=>b.addEventListener('click',()=>{selOwner=b.dataset.o;bR.classList.toggle('sel',selOwner==='rishab');bK.classList.toggle('sel',selOwner==='kimi');bBoth.classList.toggle('sel',selOwner==='both');}));
   inner.appendChild(row);inner.appendChild(pickerRow);area.appendChild(inner);return area;
 }
 
@@ -536,8 +526,9 @@ function refreshRing(key,card){const dt=getTodosForDay(key),done=dt.filter(t=>t.
 
 // ── Todo realtime ─────────────────────────────
 function handleTodoEvent(ev,rec,old){
+  const _owner=rec?.owner??old?.owner;if(_owner!=='reena')return;
   if(ev==='INSERT'){if(!todos.find(t=>t.id===rec.id)){todos.push(rec);const key=rec.date,card=feed.querySelector(`[data-key="${key}"]`);if(!card)return;const list=card.querySelector('.tlist');const hint=list.querySelector('.empty-hint');if(hint){hint.remove();card.insertBefore(mkDiv(),list);}const nr=mkRow(rec,key);nr.classList.add('new-in');list.appendChild(nr);refreshRing(key,card);}}
-  else if(ev==='UPDATE'){const idx=todos.findIndex(t=>t.id===rec.id);if(idx>=0){const key=todos[idx].date;todos[idx]={...todos[idx],...rec};const item=feed.querySelector(`.titem[data-id="${rec.id}"]`);if(item){item.classList.toggle('done-item',rec.done);const cb=item.querySelector('.cb');if(cb)cb.classList.toggle('done',rec.done);const ta=item.querySelector('.ttext');if(ta&&document.activeElement!==ta)ta.value=rec.text;const em=item.querySelector('.own-em');if(em)em.textContent=OWNERS[todos[idx].owner]||'👨🏻';}const card=feed.querySelector(`[data-key="${key}"]`);if(card)refreshRing(key,card);}}
+  else if(ev==='UPDATE'){const idx=todos.findIndex(t=>t.id===rec.id);if(idx>=0){const key=todos[idx].date;todos[idx]={...todos[idx],...rec};const item=feed.querySelector(`.titem[data-id="${rec.id}"]`);if(item){item.classList.toggle('done-item',rec.done);const cb=item.querySelector('.cb');if(cb)cb.classList.toggle('done',rec.done);const ta=item.querySelector('.ttext');if(ta&&document.activeElement!==ta)ta.value=rec.text;const em=item.querySelector('.own-em');if(em)em.textContent=OWNERS[todos[idx].owner]||'👵🏻';}const card=feed.querySelector(`[data-key="${key}"]`);if(card)refreshRing(key,card);}}
   else if(ev==='DELETE'){const id=old?.id;if(!id)return;const todo=todos.find(t=>t.id===id);if(!todo)return;const key=todo.date;todos=todos.filter(t=>t.id!==id);const row=feed.querySelector(`.trow[data-id="${id}"]`);if(row){row.style.transition='opacity 0.15s';row.style.opacity='0';setTimeout(()=>{row.remove();const card=feed.querySelector(`[data-key="${key}"]`);if(!card)return;refreshRing(key,card);const list=card.querySelector('.tlist');if(list&&list.children.length===0){const dv=card.querySelector('.hdivider');if(dv)dv.remove();list.appendChild(mkEmptyHint(key,card));}},150);}}
 }
 
@@ -572,7 +563,7 @@ function mkTile(note){
   if(trimmed){const prev=document.createElement('div');prev.className='note-tile-preview';prev.textContent=trimmed;tile.appendChild(prev);}
 
   const footer=document.createElement('div');footer.className='note-tile-footer';
-  const ownerEl=document.createElement('div');ownerEl.className='note-tile-owner';ownerEl.textContent=OWNERS[note.owner]||'👨🏻';
+  const ownerEl=document.createElement('div');ownerEl.className='note-tile-owner';ownerEl.textContent=OWNERS[note.owner]||'👵🏻';
   const lineCount=trimmed?trimmed.split('\n').filter(l=>l.trim()).length:0;
   const countEl=document.createElement('div');countEl.className='note-tile-count';countEl.textContent=lineCount>0?`${lineCount} line${lineCount!==1?'s':''}` :'';
   footer.appendChild(ownerEl);footer.appendChild(countEl);tile.appendChild(footer);
@@ -599,7 +590,7 @@ function openNote(id){
   const note=notes.find(n=>n.id===id);if(!note)return;
   openNoteId=id;
   noteDetailTitle.value=note.title;
-  noteDetailOwner.textContent=OWNERS[note.owner]||'👨🏻';
+  noteDetailOwner.textContent=OWNERS[note.owner]||'👵🏻';
   noteContent.value=note.content||'';
   noteDetail.classList.remove('hidden');
   setTimeout(()=>{noteContent.focus();noteContent.setSelectionRange(noteContent.value.length,noteContent.value.length);},320);
@@ -612,17 +603,17 @@ noteDetailTitle.addEventListener('input',()=>{clearTimeout(ntTimer);ntTimer=setT
 
 noteContent.addEventListener('input',()=>{clearTimeout(ncTimer);ncTimer=setTimeout(async()=>{if(!openNoteId)return;const n=notes.find(x=>x.id===openNoteId);if(n)n.content=noteContent.value;try{await updateNote(openNoteId,{content:noteContent.value});}catch(e){console.error('Save content failed',e);}},600);});
 
-noteDetailOwner.addEventListener('click',async()=>{if(!openNoteId)return;const n=notes.find(x=>x.id===openNoteId);if(!n)return;const order=['rishab','kimi','both'];let idx=order.indexOf(n.owner);if(idx===-1)idx=0;const next=order[(idx+1)%order.length];n.owner=next;noteDetailOwner.textContent=OWNERS[next]||'👨🏻';try{await updateNote(openNoteId,{owner:next});}catch(e){console.error('Owner update failed',e);}});
+noteDetailOwner.addEventListener('click',()=>{});
 
 // ── Add note modal ────────────────────────────
 const addNoteModal=document.getElementById('addNoteModal');
 const modalTitleInp=document.getElementById('modalTitleInp');
 const modalSubmit=document.getElementById('modalSubmit');
-let modalOwner='rishab';
+let modalOwner='reena';
 
 document.getElementById('notesFab').addEventListener('click',()=>{
-  modalTitleInp.value='';modalSubmit.disabled=true;modalOwner='rishab';
-  addNoteModal.querySelectorAll('.modal-own-btn').forEach(b=>b.classList.toggle('sel',b.dataset.o==='rishab'));
+  modalTitleInp.value='';modalSubmit.disabled=true;modalOwner='reena';
+  addNoteModal.querySelectorAll('.modal-own-btn').forEach(b=>b.classList.toggle('sel',b.dataset.o==='reena'));
   addNoteModal.classList.remove('hidden');
   setTimeout(()=>modalTitleInp.focus(),180);
 });
@@ -646,8 +637,9 @@ async function doCreateNote(){
 
 // ── Notes realtime ────────────────────────────
 function handleNoteEvent(ev,rec,old){
+  const _owner=rec?.owner??old?.owner;if(_owner!=='reena')return;
   if(ev==='INSERT'){if(!notes.find(n=>n.id===rec.id)){notes.unshift(rec);renderNotes();}}
-  else if(ev==='UPDATE'){const idx=notes.findIndex(n=>n.id===rec.id);if(idx>=0){notes[idx]={...notes[idx],...rec};if(openNoteId===rec.id){if(document.activeElement!==noteDetailTitle)noteDetailTitle.value=rec.title;if(document.activeElement!==noteContent)noteContent.value=rec.content||'';noteDetailOwner.textContent=OWNERS[rec.owner]||'👨🏻';}renderNotes();}}
+  else if(ev==='UPDATE'){const idx=notes.findIndex(n=>n.id===rec.id);if(idx>=0){notes[idx]={...notes[idx],...rec};if(openNoteId===rec.id){if(document.activeElement!==noteDetailTitle)noteDetailTitle.value=rec.title;if(document.activeElement!==noteContent)noteContent.value=rec.content||'';noteDetailOwner.textContent=OWNERS[rec.owner]||'👵🏻';}renderNotes();}}
   else if(ev==='DELETE'){const id=old?.id;if(!id)return;notes=notes.filter(n=>n.id!==id);if(openNoteId===id)closeNote();renderNotes();}
 }
 
